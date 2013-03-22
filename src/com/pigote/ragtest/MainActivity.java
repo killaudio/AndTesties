@@ -14,7 +14,6 @@ import org.andengine.entity.scene.ITouchArea;
 import org.andengine.entity.scene.Scene;
 import org.andengine.entity.scene.background.Background;
 import org.andengine.entity.shape.IShape;
-import org.andengine.entity.shape.Shape;
 import org.andengine.entity.sprite.Sprite;
 import org.andengine.extension.physics.box2d.FixedStepPhysicsWorld;
 import org.andengine.extension.physics.box2d.PhysicsConnector;
@@ -163,7 +162,7 @@ public class MainActivity extends BaseGameActivity implements
 
     	final FixtureDef wallFixtureDef = PhysicsFactory.createFixtureDef(1.0f, 0.2f, 0.1f);
 
-    	//PhysicsFactory.createBoxBody(m_PhysicsWorld, roof, BodyType.StaticBody, wallFixtureDef);
+    	PhysicsFactory.createBoxBody(m_PhysicsWorld, roof, BodyType.StaticBody, wallFixtureDef);
     	PhysicsFactory.createBoxBody(m_PhysicsWorld, ground, BodyType.StaticBody, wallFixtureDef);
     	PhysicsFactory.createBoxBody(m_PhysicsWorld, left, BodyType.StaticBody, wallFixtureDef);
     	PhysicsFactory.createBoxBody(m_PhysicsWorld, right, BodyType.StaticBody, wallFixtureDef);
@@ -262,41 +261,37 @@ public class MainActivity extends BaseGameActivity implements
     	float startY = m_CameraHeight / 2;
 
     	// BODIES
-
+    	
+    		//for head only
+	    	fixtureDef.density = 1.0f;
+	    	fixtureDef.friction = 0.1f;
+	    	fixtureDef.restitution = 0.2f;
+    	
     	// Head
-    	fixtureDef.density = 1.0f;
-    	fixtureDef.friction = 0.1f;
-    	fixtureDef.restitution = 0.2f;
     	m_HeadSprite.setPosition(startX, startY);
-
-    	Body head = PhysicsFactory.createCircleBody(m_PhysicsWorld, m_HeadSprite, BodyType.DynamicBody, 
-    			fixtureDef);                
-
+    	Body head = PhysicsFactory.createCircleBody(m_PhysicsWorld, m_HeadSprite, BodyType.DynamicBody, fixtureDef);                
     	m_HeadSprite.setUserData(head);
-
-    	// Makes him drunk ;)
-    	// head.applyLinearImpulse(new Vector2(50, 50), head.getWorldCenter());
-
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_HeadSprite, head));
 
-    	fixtureDef.density = 1.0f;
-    	fixtureDef.friction = 0.0f;
-    	fixtureDef.restitution = 1.0f;
+	    	//for rest of body
+	    	fixtureDef.density = 1.0f;
+	    	fixtureDef.friction = 0.0f;
+	    	fixtureDef.restitution = 1.0f;
     	
     	// Torso1    	
-    	m_Torso1Sprite.setPosition(startX - 6.25f, startY + 62.5f);
+    	m_Torso1Sprite.setPosition(startX, startY + m_HeadSprite.getHeight());
     	Body torso1 = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_Torso1Sprite, BodyType.DynamicBody, fixtureDef);
     	m_Torso1Sprite.setUserData(torso1);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_Torso1Sprite, torso1));
 
     	// Torso2
-    	m_Torso2Sprite.setPosition(startX - 6.25f, startY + 112.5f - 15);
+    	m_Torso2Sprite.setPosition(startX, startY + 98);
     	Body torso2 = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_Torso2Sprite, BodyType.DynamicBody, fixtureDef);
     	m_Torso2Sprite.setUserData(torso2);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector( m_Torso2Sprite, torso2));
 
     	// Torso3
-    	m_Torso3Sprite.setPosition(startX - 6.25f, startY + 162.5f - 30);
+    	m_Torso3Sprite.setPosition(startX, startY + 133);
     	Body torso3 = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_Torso3Sprite, BodyType.DynamicBody, fixtureDef);
     	m_Torso3Sprite.setUserData(torso3);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_Torso3Sprite, torso3));
@@ -304,13 +299,15 @@ public class MainActivity extends BaseGameActivity implements
     	// UpperArm
 
     	// L
-    	m_UpperArmLeftSprite.setPosition(startX - 83.75f - 15f, startY + 62.5f);
+    	m_UpperArmLeftSprite.setPosition(startX - (m_Torso1Sprite.getWidth()/2 + m_UpperArmLeftSprite.getWidth()/2),
+    									startY + m_HeadSprite.getHeight());
     	Body upperArmL = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_UpperArmLeftSprite, BodyType.DynamicBody, fixtureDef);
     	m_UpperArmLeftSprite.setUserData(upperArmL);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_UpperArmLeftSprite, upperArmL));
 
     	// R
-    	m_UpperArmRightSprite.setPosition(startX + 56.25f + 15f, startY + 62.5f);
+    	m_UpperArmRightSprite.setPosition(startX + m_Torso1Sprite.getWidth()/2 + m_UpperArmLeftSprite.getWidth()/2,
+    									startY + m_HeadSprite.getHeight());
     	Body upperArmR = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_UpperArmRightSprite, BodyType.DynamicBody, fixtureDef);
     	m_UpperArmRightSprite.setUserData(upperArmR);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_UpperArmRightSprite, upperArmR));
@@ -332,13 +329,13 @@ public class MainActivity extends BaseGameActivity implements
     	// UpperLeg
 
     	// L
-    	m_UpperLegLeftSprite.setPosition(startX - 6.25f, startY + 212.5f - 20);
+    	m_UpperLegLeftSprite.setPosition(startX - m_UpperLegLeftSprite.getWidth()/2, startY + 212.5f);
     	Body upperLegL = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_UpperLegLeftSprite, BodyType.DynamicBody, fixtureDef);
     	m_UpperLegLeftSprite.setUserData(upperLegL);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_UpperLegLeftSprite, upperLegL));
 
     	// R
-    	m_UpperLegRightSprite.setPosition(startX + 31.25f, startY + 212.5f - 20);
+    	m_UpperLegRightSprite.setPosition(startX + m_UpperLegRightSprite.getWidth()/2, startY + 212.5f);
     	Body upperLegR = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_UpperLegRightSprite, BodyType.DynamicBody, fixtureDef);
     	m_UpperLegRightSprite.setUserData(upperLegR);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector( m_UpperLegRightSprite, upperLegR));
@@ -346,13 +343,13 @@ public class MainActivity extends BaseGameActivity implements
     	// LowerLeg
 
     	// L
-    	m_LowerLegLeftSprite.setPosition(startX + 1.25f, startY + 322.5f - 35);
+    	m_LowerLegLeftSprite.setPosition(startX - m_UpperLegLeftSprite.getWidth()/2, startY + 310);
     	Body lowerLegL = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_LowerLegLeftSprite, BodyType.DynamicBody, fixtureDef);
     	m_LowerLegLeftSprite.setUserData(lowerLegL);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_LowerLegLeftSprite, lowerLegL));
 
     	// R
-    	m_LowerLegRightSprite.setPosition(startX + 31.25f, startY + 322.5f - 35);
+    	m_LowerLegRightSprite.setPosition(startX + m_UpperLegRightSprite.getWidth()/2, startY + 310);
     	Body lowerLegR = PhysicsFactory.createBoxBody(m_PhysicsWorld, m_LowerLegRightSprite, BodyType.DynamicBody, fixtureDef);
     	m_LowerLegRightSprite.setUserData(lowerLegR);
     	m_PhysicsWorld.registerPhysicsConnector(new PhysicsConnector(m_LowerLegRightSprite, lowerLegR));
@@ -363,9 +360,6 @@ public class MainActivity extends BaseGameActivity implements
     	// Head to shoulders
     	jd.lowerAngle = (float) (-40 / (180 / Math.PI));
     	jd.upperAngle = (float) (40 / (180 / Math.PI));
-
-    	// jd.initialize(torso1,
-    	// head,head.getWorldPoint(head.getLocalCenter()));
     	jd.initialize(torso1, head, getTopPoint(m_Torso1Sprite, torso1));
     	m_PhysicsWorld.createJoint(jd);
 
@@ -373,19 +367,13 @@ public class MainActivity extends BaseGameActivity implements
     	// L
     	jd.lowerAngle = (float) (-85 / (180 / Math.PI));
     	jd.upperAngle = (float) (130 / (180 / Math.PI));
-
-    	// jd.initialize(torso1, upperArmL, getLeftPoint(m_Torso1Sprite,
-    	// torso1));
     	jd.initialize(torso1, upperArmL, getRightPoint(m_UpperArmLeftSprite, upperArmL));
-
     	m_PhysicsWorld.createJoint(jd);
+
     	// R
     	jd.lowerAngle = (float) (-130 / (180 / Math.PI));
     	jd.upperAngle = (float) (85 / (180 / Math.PI));
-    	// jd.initialize(torso1, upperArmR, getRightPoint(m_Torso1Sprite,
-    	// torso1));
     	jd.initialize(torso1, upperArmR, getLeftPoint(m_UpperArmRightSprite, upperArmR));
-
     	m_PhysicsWorld.createJoint(jd);
 
     	// Lower arm to upper arm
@@ -442,10 +430,8 @@ public class MainActivity extends BaseGameActivity implements
     		float pTouchAreaLocalY) {
     	if(pSceneTouchEvent.isActionDown()) {
     		final IShape face = (IShape) pTouchArea;
-    		/*
-    		 * If we have a active MouseJoint, we are just moving it around
-    		 * instead of creating a second one.
-    		 */
+    		 // If we have an active MouseJoint, we are just moving it around
+    		 // instead of creating a second one.
     		if (this.mMouseJointActive == null) {
     			//this.mEngine.vibrate(100);
     			this.mMouseJointActive = this.createMouseJoint(face, pTouchAreaLocalX, pTouchAreaLocalY);
