@@ -2,7 +2,10 @@ package com.pigote.ragtest;
 
 import java.io.IOException;
 
+import org.andengine.engine.LimitedFPSEngine;
 import org.andengine.engine.camera.Camera;
+import org.andengine.engine.handler.timer.ITimerCallback;
+import org.andengine.engine.handler.timer.TimerHandler;
 import org.andengine.engine.options.EngineOptions;
 import org.andengine.engine.options.ScreenOrientation;
 import org.andengine.engine.options.WakeLockOptions;
@@ -15,12 +18,19 @@ import org.andengine.entity.scene.Scene;
 import org.andengine.entity.scene.background.Background;
 import org.andengine.entity.shape.IShape;
 import org.andengine.entity.sprite.Sprite;
+import org.andengine.entity.sprite.UncoloredSprite;
 import org.andengine.extension.physics.box2d.FixedStepPhysicsWorld;
 import org.andengine.extension.physics.box2d.PhysicsConnector;
 import org.andengine.extension.physics.box2d.PhysicsFactory;
 import org.andengine.extension.physics.box2d.util.Vector2Pool;
 import org.andengine.extension.physics.box2d.util.constants.PhysicsConstants;
 import org.andengine.input.touch.TouchEvent;
+import org.andengine.opengl.shader.PositionTextureCoordinatesShaderProgram;
+import org.andengine.opengl.shader.ShaderProgram;
+import org.andengine.opengl.shader.constants.ShaderProgramConstants;
+import org.andengine.opengl.shader.exception.ShaderProgramException;
+import org.andengine.opengl.shader.exception.ShaderProgramLinkException;
+import org.andengine.opengl.texture.PixelFormat;
 import org.andengine.opengl.texture.TextureOptions;
 import org.andengine.opengl.texture.atlas.bitmap.BitmapTextureAtlas;
 import org.andengine.opengl.texture.atlas.bitmap.BitmapTextureAtlasTextureRegionFactory;
@@ -29,15 +39,23 @@ import org.andengine.opengl.texture.atlas.bitmap.source.IBitmapTextureAtlasSourc
 import org.andengine.opengl.texture.atlas.buildable.builder.BlackPawnTextureAtlasBuilder;
 import org.andengine.opengl.texture.atlas.buildable.builder.ITextureAtlasBuilder.TextureAtlasBuilderException;
 import org.andengine.opengl.texture.region.ITextureRegion;
+import org.andengine.opengl.texture.region.TextureRegionFactory;
+import org.andengine.opengl.texture.render.RenderTexture;
+import org.andengine.opengl.util.GLState;
 import org.andengine.opengl.vbo.VertexBufferObjectManager;
+import org.andengine.opengl.vbo.attribute.VertexBufferObjectAttributes;
 import org.andengine.ui.activity.BaseGameActivity;
+import org.andengine.util.adt.color.Color;
 import org.andengine.util.debug.Debug;
+
+import android.annotation.SuppressLint;
+import android.opengl.GLES20;
 
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
-import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.BodyDef.BodyType;
+import com.badlogic.gdx.physics.box2d.FixtureDef;
 import com.badlogic.gdx.physics.box2d.joints.MouseJoint;
 import com.badlogic.gdx.physics.box2d.joints.MouseJointDef;
 import com.badlogic.gdx.physics.box2d.joints.RevoluteJointDef;
@@ -81,12 +99,15 @@ public class MainActivity extends BaseGameActivity implements
 
     Sprite m_DebugTextureSprite;
     
+	private float mShockwaveTime = 0f;
+	private Camera camera;
+	
     public BuildableBitmapTextureAtlas gameTextureAtlas;
 
     @Override
     public EngineOptions onCreateEngineOptions() {
 
-    	Camera camera = new Camera(0, 0, m_CameraWidth, m_CameraHeight);
+    	camera = new Camera(0, 0, m_CameraWidth, m_CameraHeight);
         EngineOptions options = new EngineOptions(true,
                             ScreenOrientation.PORTRAIT_FIXED, new RatioResolutionPolicy(
                                             m_CameraWidth, m_CameraHeight), camera);
@@ -99,6 +120,60 @@ public class MainActivity extends BaseGameActivity implements
         return options;
     }
 
+    @Override
+    public LimitedFPSEngine onCreateEngine(final EngineOptions pEngineOptions) {
+        return new LimitedFPSEngine(pEngineOptions, 60) {
+            private boolean mRenderTextureInitialized;
+            
+            private RenderTexture mRenderTexture;
+            private UncoloredSprite mRenderTextureSprite;
+           
+            @SuppressLint("WrongCall")
+			@Override
+            public void onDrawFrame(GLState pGLState)
+                            throws InterruptedException {
+                   
+                    if (mShockwaveTime > 0f && mShockwaveTime < 10f) {
+                           
+                            if (!mRenderTextureInitialized) {
+                                    initRenderTexture(pGLState);
+                                    mRenderTextureInitialized = true;
+                            }
+                           
+                            mRenderTexture.begin(pGLState, false, true, Color.TRANSPARENT);
+                            {              
+                                    super.onDrawFrame(pGLState);
+                            }
+                            mRenderTexture.end(pGLState);
+                                                           
+                            pGLState.pushProjectionGLMatrix();
+                            pGLState.orthoProjectionGLMatrixf(0, m_CameraWidth, m_CameraHeight, 0, -1, 1);
+                            {
+                                    mRenderTextureSprite.onDraw(pGLState, camera);
+                            }
+                            pGLState.popProjectionGLMatrix();      
+                    } else {
+                            super.onDrawFrame(pGLState);
+                    }
+            }
+           
+            private void initRenderTexture(GLState pGLState) {
+                    mRenderTexture = new RenderTexture(getTextureManager(), m_CameraWidth, m_CameraHeight, PixelFormat.RGBA_4444);
+                    mRenderTexture.init(pGLState);
+                    mRenderTextureSprite = new UncoloredSprite(m_CameraWidth/2, m_CameraHeight/2, TextureRegionFactory.extractFromTexture(mRenderTexture), getVertexBufferObjectManager()) {
+                            @Override
+                            protected void preDraw(GLState pGLState, Camera pCamera) {
+                                    super.preDraw(pGLState, pCamera);
+                                    if (mShockwaveTime > 0f && mShockwaveTime < 10f) GLES20.glUniform1f(ShockwaveShaderProgram.sUniformTimeLocation, mShockwaveTime);
+                            }
+                    };
+                    mRenderTextureSprite.setShaderProgram(ShockwaveShaderProgram.getInstance());                           
+            }
+        };        	
+
+    };
+	
+    
     @Override
     public void onCreateResources( OnCreateResourcesCallback pOnCreateResourcesCallback)
     			throws IOException {
@@ -130,7 +205,7 @@ public class MainActivity extends BaseGameActivity implements
     	{
     	        Debug.e(e);
     	}
-        
+        this.getShaderProgramManager().loadShaderProgram(ShockwaveShaderProgram.getInstance());
         pOnCreateResourcesCallback.onCreateResourcesFinished();
     }
 
@@ -150,7 +225,7 @@ public class MainActivity extends BaseGameActivity implements
     }
 
     @Override
-    public void onPopulateScene(Scene pScene, OnPopulateSceneCallback pOnPopulateSceneCallback)
+    public void onPopulateScene(final Scene pScene, OnPopulateSceneCallback pOnPopulateSceneCallback)
     	throws IOException {
     		 	
     	mGroundBody = this.m_PhysicsWorld.createBody(new BodyDef());
@@ -160,6 +235,11 @@ public class MainActivity extends BaseGameActivity implements
 		final Rectangle left = new Rectangle(1, m_CameraHeight / 2, 1, m_CameraHeight, vbom);
 		final Rectangle right = new Rectangle(m_CameraWidth - 1, m_CameraHeight / 2, 2, m_CameraHeight, vbom);
 
+		ground.setColor(Color.BLACK);
+		roof.setColor(Color.BLACK);
+		left.setColor(Color.BLACK);
+		right.setColor(Color.BLACK);
+		
     	final FixtureDef wallFixtureDef = PhysicsFactory.createFixtureDef(1.0f, 0.2f, 0.1f);
 
     	PhysicsFactory.createBoxBody(m_PhysicsWorld, roof, BodyType.StaticBody, wallFixtureDef);
@@ -202,7 +282,18 @@ public class MainActivity extends BaseGameActivity implements
     	// m_DebugTextureSprite = new Sprite(0, 0, m_DebugTexture);
     	// scene.getChild(0).attachChild(m_DebugTextureSprite);
 
-    	pScene.registerUpdateHandler(this.m_PhysicsWorld);
+    	//pScene.registerUpdateHandler(this.m_PhysicsWorld);
+    	
+    	pScene.registerUpdateHandler(new TimerHandler(0.08f, true, new ITimerCallback() {
+            @Override
+            public void onTimePassed(TimerHandler pTimerHandler) {
+                    mShockwaveTime += 0.02f;
+                    if (mShockwaveTime > 1.2f) {
+                            pScene.unregisterUpdateHandler(pTimerHandler);
+                            mShockwaveTime = 0.0f;
+                    }
+            }
+    	}));
     	
     	pOnPopulateSceneCallback.onPopulateSceneFinished();
     }
@@ -483,6 +574,80 @@ public class MainActivity extends BaseGameActivity implements
     	Vector2Pool.recycle(localPoint);
 
     	return (MouseJoint) this.m_PhysicsWorld.createJoint(mouseJointDef);
+    }
+    
+    public static class ShockwaveShaderProgram extends ShaderProgram {
+    	
+    	private static ShockwaveShaderProgram instance;
+    	
+    	public static ShockwaveShaderProgram getInstance() {
+    		if (instance == null) instance = new ShockwaveShaderProgram();
+    		return instance;
+    	}
+    			
+    	public static final String FRAGMENTSHADER = 
+    	"precision lowp float;\n" +
+
+    	"uniform lowp sampler2D " + ShaderProgramConstants.UNIFORM_TEXTURE_0 + ";\n" +
+    	"varying mediump vec2 " + ShaderProgramConstants.VARYING_TEXTURECOORDINATES + ";\n" +
+    	
+    	"uniform vec2 center;\n" +
+    	"uniform float time;\n" +
+    	"const vec3 params = vec3(10.0, 0.8, 0.02);\n" +
+
+    	"void main()	\n" +
+    	"{				\n" +
+    	"	mediump vec2 texCoord = " + ShaderProgramConstants.VARYING_TEXTURECOORDINATES + ";\n" +
+    	"	float distance = distance(texCoord, center);\n" +
+    	"	if ( (distance <= (time + params.z)) && (distance >= (time - params.z)) )\n" +
+    	"	{\n" +		
+    	"		float diff = (distance - time);\n" +
+    	"		float powDiff = 1.0 - pow(abs(diff*params.x), params.y);\n" +
+    	"		float diffTime = diff  * powDiff;\n" +
+    	"		vec2 diffUV = texCoord - center;\n" +
+    //	"		texCoord = texCoord + (diffUV * diffTime);\n" +
+    	"	}\n" +
+    	"	gl_FragColor = texture2D(" + ShaderProgramConstants.UNIFORM_TEXTURE_0 + ", texCoord);\n" +
+    	"}		\n";
+
+    	 
+    	private ShockwaveShaderProgram() {
+    		super(PositionTextureCoordinatesShaderProgram.VERTEXSHADER, FRAGMENTSHADER);
+    	}
+    	
+    	public static int sUniformModelViewPositionMatrixLocation = ShaderProgramConstants.LOCATION_INVALID;
+    	public static int sUniformTexture0Location = ShaderProgramConstants.LOCATION_INVALID;
+    	public static int sUniformCenterLocation = ShaderProgramConstants.LOCATION_INVALID;
+    	public static int sUniformTimeLocation = ShaderProgramConstants.LOCATION_INVALID;
+    	
+    	@Override
+    	protected void link(final GLState pGLState) throws ShaderProgramLinkException {
+    		GLES20.glBindAttribLocation(this.mProgramID, ShaderProgramConstants.ATTRIBUTE_POSITION_LOCATION, ShaderProgramConstants.ATTRIBUTE_POSITION);
+    		GLES20.glBindAttribLocation(this.mProgramID, ShaderProgramConstants.ATTRIBUTE_TEXTURECOORDINATES_LOCATION, ShaderProgramConstants.ATTRIBUTE_TEXTURECOORDINATES);
+
+    		super.link(pGLState);
+
+    		ShockwaveShaderProgram.sUniformModelViewPositionMatrixLocation = this.getUniformLocation(ShaderProgramConstants.UNIFORM_MODELVIEWPROJECTIONMATRIX);
+    		ShockwaveShaderProgram.sUniformTexture0Location = this.getUniformLocation(ShaderProgramConstants.UNIFORM_TEXTURE_0);
+    		ShockwaveShaderProgram.sUniformCenterLocation = this.getUniformLocation("center");
+    		ShockwaveShaderProgram.sUniformTimeLocation = this.getUniformLocation("time");
+    	}
+    	
+    	@Override
+    	public void bind(final GLState pGLState, final VertexBufferObjectAttributes pVertexBufferObjectAttributes) {
+    		GLES20.glDisableVertexAttribArray(ShaderProgramConstants.ATTRIBUTE_COLOR_LOCATION);
+    		super.bind(pGLState, pVertexBufferObjectAttributes);
+    		GLES20.glUniformMatrix4fv(ShockwaveShaderProgram.sUniformModelViewPositionMatrixLocation, 1, false, pGLState.getModelViewProjectionGLMatrix(), 0);
+    		GLES20.glUniform1i(ShockwaveShaderProgram.sUniformTexture0Location, 0);
+    		GLES20.glUniform2f(ShockwaveShaderProgram.sUniformCenterLocation, -1, -1);
+    	}
+
+      
+    	@Override
+    	public void unbind(final GLState pGLState) throws ShaderProgramException {
+    		GLES20.glEnableVertexAttribArray(ShaderProgramConstants.ATTRIBUTE_COLOR_LOCATION);
+    		super.unbind(pGLState);
+    	}
     }
 
 }
